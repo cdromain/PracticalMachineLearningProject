@@ -1,72 +1,57 @@
-# Predicting human physical activity using sensors data
-[Romain Faure](https://github.com/cdromain) (R 3.3.3, RStudio 1.0.136, OSX 10.11.6)  
+# Qualitative physical activity recognition using sensors data
+[Romain Faure](https://github.com/cdromain)  
 March 2017  
 
 # Introduction
 
-Using personal *wearable* monitoring devices (such as Jawbone Up, Nike FuelBand, Fitbit...), it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the *quantified self movement* – a group of enthusiasts who take measurements about themselves regularly to improve their health or find patterns in their behavior. In parallel, Human Activity Recognition (HAR) has emerged as a key research area in the last years.
+Using personal *wearable* monitoring devices, it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the *quantified self movement* – a group of enthusiasts who take measurements about themselves regularly to improve their health or find patterns in their behavior. In parallel, *Human Activity Recognition (HAR)* has emerged as a key research area in the last years.
 
-People tend to quantify how much of a particular activity they do, or discriminate between different activities, i.e. predict which activity they do at a specific point in time, but they rarely quantify how well they perform a specific activity. In this project, our goal will be to use the Weight Lifting Exercises Dataset, i.e. data from accelerometers sensors that were placed on the belt, forearm, arm, and dumbell of $6$ male participants (aged between 20-28 years), to predict how they actually did the exercise. 
+Usually, people tend to quantify how much of a particular activity they do, or discriminate between different activities (i.e. predict which activity they do at a specific point in time), but they rarely quantify *how well* they perform a specific activity. 
 
-The participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in $5$ different ways : correctly, i.e. exactly according to the specified execution of the exercise (class A), or incorrectly, like throwing the elbows to the front (class B), lifting the dumbbell only halfway (class C), lowering the dumbbell only halfway (class D) and throwing the hips to the front (class E).
+In this project, our goal will be to use the Weight Lifting Exercises data set, i.e. data captured by **on-body sensors** that were placed on the belt, forearm, arm, and dumbell of $6$ male participants (aged between 20-28 years), to predict how they actually did the exercise. *Figure 1* below shows the experiment setup that was used ([source](http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf)) :
 
-Therefore, we are here dealing with a **classification** problem. More specifically, our goal in this project is to build a prediction model capable of identifying the manner in which the participants did the exercise (i.e. the `classe` variable, our outcome), classifying every observation in one of the $5$ classes, using the remaining variables in the training set.
+<img src="./index_files/figure-html/Sensing_setup.png" width="400px" />
 
-More information is available from the website here: http://groupware.les.inf.puc-rio.br/har#weight_lifting_exercises 
+The participants were asked to perform one set of $10$ repetitions of the unilateral dumbbell biceps curl (a biceps curl repetition involves raising and lowering the dumbbell) in $5$ different ways : correctly, i.e. exactly according to the specified execution of the exercise (class A), or incorrectly, like throwing the elbows to the front (class B), lifting the dumbbell only halfway (class C), lowering the dumbbell only halfway (class D) and throwing the hips to the front (class E).
 
-# Loading the data and necessary packages
+The aim of this experiment was to investigate the feasibility of automatically assessing the quality of execution of weight lifting exercises - so-called **qualitative activity recognition**.
+
+Therefore, we are here dealing with a **classification** problem. More specifically, our goal in this project is to build a prediction model capable of identifying the manner in which the participants did the exercise (i.e. the `classe` variable in the training set, our outcome), classifying every observation in one of the $5$ classes using the remaining variables in the training set.
+
+> More information is available on this [website](http://groupware.les.inf.puc-rio.br/har#weight_lifting_exercises) and in this [paper](http://groupware.les.inf.puc-rio.br/public/papers/2013.Velloso.QAR-WLE.pdf).
+
+# Loading the data and the necessary packages
 
 We start by downloading the data using the script below :
 
 
 ```r
-## Data downloading
+# Data downloading
 
-## check if a "data" directory exists in the current working directory
+## Check if a "data" directory exists in the current working directory
 ## and create it if not
-downloaded <- FALSE
 
 if (!file.exists("data")) { 
         dir.create("data")
 }
 
+## Check if the 2 data files already exist in the "data" directory
+## and download them if not
+
 if (!file.exists("./data/pml-training.csv")) { 
-        dir.create("data")
         ## download the training data CSV file
         fileUrl1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
         download.file(fileUrl1, "./data/pml-training.csv", method = "curl")
-        downloaded <- TRUE
 }
 
 if (!file.exists("./data/pml-testing.csv")) { 
         ## download the test data CSV file
         fileUrl2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
         download.file(fileUrl2, "./data/pml-testing.csv", method = "curl")
-        downloaded <- TRUE
 }
-
-
-if (downloaded == TRUE) {
-        ## save and print the download time and date
-        downloadedDate <- date()
-}
-
-print("Files downloaded on :")
 ```
 
-```
-## [1] "Files downloaded on :"
-```
-
-```r
-print(downloadedDate)
-```
-
-```
-## [1] "Sat Mar 18 20:06:40 2017"
-```
-
-We then load the packages necessary for our analysis, set the seed for reproducibility purposes and read in the downloaded training and test data CSV files (specifying that empty cells should be interpreted as NAs) :
+We then load the packages necessary for our analysis, set the seed for reproducibility purposes and read in the downloaded training and test data CSV files (specifying that empty cells should be interpreted as NA using `read.csv`'s `na.strings` argument) :
 
 
 ```r
@@ -76,8 +61,7 @@ library(randomForest)
 library(VIM)
 library(psych)
 library(ggplot2)
-library(parallel)
-library(doParallel)
+library(parallel); library(doParallel)
 
 ## setting the seed
 set.seed(777)
@@ -89,10 +73,8 @@ test <- read.csv(file = "./data/pml-testing.csv", header = TRUE, na.strings = c(
 
 # Exploratory Data Analysis
 
+We start by checking the dimensions of the `training` data frame :
 
-```r
-cat("Numbers of rows : "); nrow(training)
-```
 
 ```
 ## Numbers of rows :
@@ -100,10 +82,6 @@ cat("Numbers of rows : "); nrow(training)
 
 ```
 ## [1] 19622
-```
-
-```r
-cat("Numbers of columns : "); ncol(training)
 ```
 
 ```
@@ -114,13 +92,12 @@ cat("Numbers of columns : "); ncol(training)
 ## [1] 160
 ```
 
+Our training set has $19622$ observations (rows) and $160$ variables (columns).
+
+We then check if the training set contains missing data (`NA`), using the `aggr` function from the [`VIM` package](https://cran.r-project.org/web/packages/VIM/index.html). This function outputs a plot showing the proportion of variables containing missing values, as well as a list of the variables sorted by number of missing values : 
 
 
-```r
-aggr(training, col=c('blue','red'), numbers=TRUE, sortVars=TRUE, only.miss = TRUE, labels=names(training), varheight = TRUE, combined = TRUE, cex.lab = 1, cex.axis = .2, cex.numbers = 0.8, ylab=c("Figure 1 : Missing data (red) in the training set"))
-```
-
-![](index_files/figure-html/unnamed-chunk-4-1.png)<!-- -->
+![](index_files/figure-html/unnamed-chunk-5-1.png)<!-- -->
 
 ```
 ## 
@@ -288,26 +265,29 @@ aggr(training, col=c('blue','red'), numbers=TRUE, sortVars=TRUE, only.miss = TRU
 ##                    classe     0
 ```
 
+As we can see, a large proportion of the `training` data frame variables contain $97.9\%$ of missing values ($19216$) - the missing values are shown in red in *Figure 2* above.
+
+We then use a `for` loop to list the variables of the training set which contain missing values, and store them in the `colNA` variable :
+
 
 ```r
-cat("\n classe variable :\n")
+## Select the columns with NAs or empty values
+colNA <- c()
+
+for(i in 1:ncol(training)) {
+        if (sum(is.na(training[, i])) > 0) {
+                colNA <- c(colNA, i)
+        }
+}
 ```
 
-```
-## 
-##  classe variable :
-```
+Among the 160 variables of the training set, 100  contain missing values and only 60 contain no missing value.
 
-```r
-str(training$classe)
-```
+Finally we take a closer look at our outcome variable, `classe`, i.e. the variable that we'll be predicting :
+
 
 ```
 ##  Factor w/ 5 levels "A","B","C","D",..: 1 1 1 1 1 1 1 1 1 1 ...
-```
-
-```r
-summary(training$classe)
 ```
 
 ```
@@ -315,54 +295,22 @@ summary(training$classe)
 ## 5580 3797 3422 3216 3607
 ```
 
-3. Data Pre-processing and features selection
+`classe` is a **factor** variable with $5$ levels, `A`, `B`, `C`, `D` and `E`, corresponding to the $5$ ways of doing the exercise (see the introduction for more information).  
 
+# Data pre-processing and features selection
 
-```r
-## Select the columns with NAs or empty values
-#trainingOk <- apply(training, 2, function(x) gsub("^$|^ $", NA, x))
+We now know that our training set has 100 mostly empty columns. We can see these variables as *unsignificant noise* which would perturb our prediction models. Therefore, missing values in the training set should be handled before we can train our models, which means either imputing them or subsetting them out from the training set. Given the large number of mostly empty columns, imputation does not appear to be a relevant strategy, that's why we decide instead to **subset** the training set to only keep the complete columns with no missing value (in blue in the right hand side of *Figure 2* above), so as to use them as predictors when building our models.
 
-colNA <- c()
+We also decide to remove the first column of the training set, `X` (i.e. the row id number), as keeping it in our models might lead to overfitting - in other words, it would hinder our models generalization ability. 
 
-for(i in 1:ncol(training)) {
-        if (sum(is.na(training[,i])) > 0) {
-                colNA <- c(colNA, i)
-        }
-}
-```
+> In the case of our test set, keeping the `X` variable as a predictor makes the model predict `A` for the $20$ test observations, which seems to be a clear symptom of overfitting (as the observations in the training set are ordered by `classe`, i.e. the first $20$ observations in the training set are all assigned to the class `A`).
 
-We just saw that the training set has 100 empty columns, which we can see as silent (i.e. unsignificant) noise which would perturb our prediction models. Therefore, missing values in the training set should be handled before we can train our models, which means either imputing them or subsetting them out from the training set. Given the large number of mostly empty columns, imputation does not appear to be the best strategy, therefore we decide to subset the training set to only keep the complete columns (in blue in the plot above), using a `for` loop to determine which variables do not contain missing values, in order to use the complete columns as predictors to build our models.
-
-We also remove the first column of the `training` data frame, `X`, (i.e. the row id number), as keeping it in our models would result in overfitting. In other words, it would hinder our model generalization ability. In the case of our test set, keeping the `X` variable as a predictor would lead the model to predict only `A` for the $20$ test observations, which seems to be a clear symptom of overfitting (as the observations in the training set are ordered by class, i.e. starting with `A`). We finally remove the second variable `user_name` as well, as it does not seem like a useful feature for generalization and prediction purposes (where new data would probably mean new users, i.e. new user names).
+We finally remove the second variable `user_name` as well, as it does not seem like a useful and relevant feature from a generalization and prediction point of view (new data might involve new users, i.e. new `user_name` values).
 
 > We also considered removing the $3$ timestamps variables, as keeping them as predictors seems like it might limit the future generalization ability of our models. But as removing them slightly reduces the resulting models accuracy, we decide to keep them to maximize the accuracy in the specific context of this assignment.
 
-This results in a new training set (`trainingOk`) containing only $58$ variables that we'll use as predictors :
+This results in a new training set, `trainingOk`, containing only $58$ variables - our outcome, `classe`, and $57$ other variables that we'll use as predictors in our models :
 
-
-```r
-## Subsetting the training set to remove the columns with NAs 
-## as well as the first column (X)
-trainingOk <- training[, -c(1:2, colNA)]
-
-cat("Numbers of columns : "); ncol(trainingOk)
-```
-
-```
-## Numbers of columns :
-```
-
-```
-## [1] 58
-```
-
-```r
-cat("\n")
-```
-
-```r
-describe(trainingOk, skew = FALSE, ranges = FALSE)[1:2]
-```
 
 ```
 ##                      vars     n
@@ -426,47 +374,76 @@ describe(trainingOk, skew = FALSE, ranges = FALSE)[1:2]
 ## classe*                58 19622
 ```
 
-# Modeling strategy and model selection
+# Modeling strategy
 
-- Given that we are dealing with a non-binary classification problem (5 classes), we decide to work with and compare the performance of  three tree-based ensembling types of methods : bagging (model 1), boosting (model 2) and random forest (model 3).
+## Algorithms short-list 
 
-1. `method = "treebag"` - Bagged CART, more specifically bagging classification trees with bootstrap replications.
+Given that we are dealing with a **non-binary classification** problem ($5$ classes), we decide to work with and compare the performance of three **tree-based ensembling** types of methods : *bagging* (model 1), *boosting* (model 2) and *random forest* (model 3).
 
-2. `method = "gbm"` - A stochastic gradient boosted model with multinomial loss function.
+1. `method = "treebag"` - bagged CART, more specifically bagging classification trees with bootstrap replications.
 
-3. `method = "rf"` : Random forest algorithm.
+2. `method = "gbm"` - a stochastic gradient boosted model with multinomial loss function.
 
-- **Cross-validation** : we decide to use cross-validation as part of our models training to limit overfitting and get an OOB error rate estimate. 5-fold cross-validation seems enough, as using a classical value of `k = 10` doubles the processing time for only a marginal accuracy improvement with two of our three models : $+ 0.02\%$ with the bagged CART and the random forest algorithms but $- 0.03\%$ with GBM. As a value of $k = 5$ already means more than $7$ minutes of computation for the random forest algorithm (on the computer we're using) and satisfactory accuracy results, we decide to use 5-fold cross validation.
+3. `method = "rf"` - random forest algorithm.
 
-5 fold cross validation : accuracy / processing time (elapsed)
-1 Treebag : 0.9989808 / 57.623 sec
-2 GBM : 0.9970953 / 163.605 sec
-3 RF : 0.9992866 / 480.586 sec
+## Cross-validation
 
-10 fold cross validation : accuracy / processing time (elapsed)
-1 Treebag : 0.9991845 (+ 0.0002037) / 92.013 sec
-2 GBM : 0.9968405 (- 0.0002548) / 299.202 sec
-3 RF : 0.9994394 (+ 0.0001528) / 963.143 sec
+We decide to use **k-fold cross-validation** when building (i.e. training) our models to limit **overfitting** and get an estimate of the **out of sample (OOB, out-of-bag) accuracy**.
 
-- **Algorithms parameters** : using the default algorithms parameters led to a sufficient accuracy, so we did not change them.
+> Indeed, when doing **k-fold cross-validation**, for each fold the model is trained on $\frac{k - 1}{k}$ of the training data and then tested on the held-out (i.e. out-of-bag) remaining $\frac{1}{k}$. 
 
-- **Parallel processing** : we use parallel processing to speed up the processing time required to train our models. Especially useful since :
+5-fold cross-validation seems sufficient in this context, as using a classical value of $k = 10$ basically more than doubles the processing time (except for the bagged CART) for only a marginal accuracy improvement with our three models ($+ 0.02\%$ with the bagged CART and $+ 0.01\%$ with GBM and random forest). See the measurements tables below comparing 5 and 10-fold cross-validation on the training set (using parallel processing on an Apple MacBookPro 15" 2013) :
+
+- **5-fold cross-validation** :
+
+| Model | Accuracy | Processing time (elapsed) |
+|:---------|:---------:|:------:|
+| 1 Bagged CART    | 0.9989808 | 54.4 sec |
+| 2 GBM    | 0.9967895 | 155.0 sec |
+| 3 Random forest    | 0.9992865 | 499.2 sec |
+\newline
+
+- **10-fold cross-validation** :
+
+| Model | Accuracy | Processing time (elapsed) |
+|:---------|:---------:|:------:|
+| 1 Bagged CART    | 0.9991845 (*+ 0.0002037*) | 91.2 sec |
+| 2 GBM    | 0.9968914 (*+ 0.0001019*) | 348.8 sec |
+| 3 Random forest    | 0.9993884 (*+ 0.0001019*) | 1294.9 sec |
+
+As a value of $k = 5$ already means more than $8$ minutes of computation for the random forest algorithm and yields satisfactory accuracy results, **5-fold cross-validation** seems to offer a good compromise between accuracy and processing time in this context. Therefore that's what we're going to use to train our models.
+
+> According to the random forest creator, Leo Breiman, *"in random forests, there is no need for cross-validation or a separate test set to get an unbiased estimate of the test set error. It is estimated internally, during the run"* ([source](https://www.stat.berkeley.edu/~breiman/RandomForests/cc_home.htm#ooberr)). But to stay on the safe side and keep a common framework for our three models, we decide to use 5-fold cross-validation anyway with our three models, including the random forest-based model.
+
+## Algorithms parameters
+
+We choose to use the default parameters for our three models algorithms as these default values yield a satisfactory accuracy in this specific context.
+
+## Parallel processing
+
+We use **parallel processing** to speed up the processing time required to train our models. It's especially useful in this context since :
         
-        - the training set is fairly large (almost $20000$ observations)
-        - the algorithms we chose are fairly intensive (especially random forest)
-        - the computer the analysis is run on has $4$ cores.
+- The training set is fairly large (almost $20000$ observations).
+
+- The algorithms we chose are fairly computationally intensive (especially random forest) as they are ensembling methods.
+
+- We use 5-fold cross-validation.
+
+- The computer the analysis is run on (Apple MacBookPro 15" 2013) has $4$ cores.
         
 To enable parallel processing, we follow the [procedure described by the T.A. Len Greski](https://github.com/lgreski/datasciencectacontent/blob/master/markdown/pml-randomForestPerformance.md), using the packages `parallel` and `doParallel`.
 
+# Computations and model selection
 
+To evaluate and compare our three prediction models, we train them using `caret`'s `train` function to predict the `classe` variable in the training set using all the remaining variables :
 
 
 ```r
-## Configure parallel processing
+## Configuring parallel processing
 cluster <- makeCluster(detectCores() - 1) # convention to leave 1 core for OS
 registerDoParallel(cluster)
 
-## Configure trainControl object
+## Configuring trainControl object with parallel processing and 5-fold CV
 fitControl <- trainControl(method = "cv", number = 5, 
                            allowParallel = TRUE)
 
@@ -565,44 +542,53 @@ mod3rf
 ```
 
 ```r
-## De-register parallel processing cluster
+## De-registering parallel processing cluster
 stopCluster(cluster)
 registerDoSEQ()
 ```
 
-We can then make a plot comparing the resulting accuracy and processing time of each of our three prediction models :
+We can then make a plot using `ggplot2` to compare the resulting accuracy and processing time of each of our three prediction models :
 
 
 ```r
-modComp <- data.frame(x = c(mod1bag$times[[1]][3], mod2gbm$times[[1]][3], mod3rf$times[[1]][3]), y = c(mod1bag$results[[2]], mod2gbm$results[9, 5], mod3rf$results[2, 2]), model = c("1 treebag", "2 gbm", "3 rf"))
+modComp <- data.frame(x = c(mod1bag$times[[1]][3], mod2gbm$times[[1]][3], mod3rf$times[[1]][3]), 
+                      y = c(mod1bag$results[[2]], mod2gbm$results[9, 5], mod3rf$results[2, 2]), 
+                      model = c("1 treebag", "2 gbm", "3 rf"))
 
 g <- ggplot(modComp, aes(x = x, y = y, colour = model))
 g <- g + geom_point(size = 4)
 
-g <- g + ggtitle("Figure 2 : Models comparison") 
-g + theme(plot.title = element_text(hjust=0.5, size = 10), 
-                 axis.title = element_text(size = 8)) + 
+g <- g + ggtitle("Figure 3 : Models comparison") 
+g <- g + theme(plot.title = element_text(hjust=0.5, size = 11), 
+               axis.title = element_text(size = 9)) + 
         labs(x = "Processing time (seconds)", y = "Model accuracy")
-```
-
-![](index_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
-
-We decide to use a random forest algorithm (`rf`) for our final prediction model as its accuracy was the highest, then followed by the Bagged CART (`treebag`) and finally GBM. Note that random forest was also by far the most processing-intensive algorithm out of the three. The bagged CART model could have been an interesting compromise as its accuracy is close to the random forest's, but only requires one eighth of the computing time required by the random forest. But in the specific context of this assignment we decide to stay with the most accurate model, i.e. the random forest.
-
-# Results
-
-The final random forest model used the following parameters : `mtry = 38`, `n.trees = 150`, `interaction.depth = 3`, `shrinkage = 0.1` and `n.minobsinnode = 10`. 
-
-We can see that `mtry = 38` corresponds to the optimal value according to the random forest algorithm predictors random selection (increasing the parameter value decreases the resulting accuracy) :
-
-
-```r
-plot(mod3rf, main = "Figure 3 : Final model predictors random selection")
+g
 ```
 
 ![](index_files/figure-html/unnamed-chunk-10-1.png)<!-- -->
 
-Our final random forest-based model enables us to correctly predict the `classe` of $100\%$ of the training observations, with a $(0.9998, 1)$ confidence interval (as well as the $20$ test cases part of the prediction quiz) :
+After looking at *Figure 3* above, we decide to use the **random forest** algorithm (`rf`) for our final prediction model as its accuracy is the highest, then followed by the bagged CART (`treebag`) and finally GBM. Note that random forest was also by far the most computationally intensive algorithm out of the three. 
+
+> The bagged CART model could have been an interesting compromise as its accuracy is close to the random forest's, but only requires a small fraction of the computing time required by the random forest. But in the specific context of this assignment, we decide to stay with the most accurate model, i.e. the random forest.
+
+# Results
+
+The random forest algorithm selects the optimal model based on its accuracy. The final model which was selected by the algorithm used the following parameters : `mtry = 38` and `n.trees = 500`.
+
+> The `mtry` parameter corresponds to the number of variables available for splitting at each tree node. ([source](http://code.env.duke.edu/projects/mget/export/HEAD/MGET/Trunk/PythonPackage/dist/TracOnlineDocumentation/Documentation/ArcGISReference/RandomForestModel.FitToArcGISTable.html))
+>
+> The `n.trees` parameter refers to the number of trees.
+
+We can see in *Figure 4* below that `mtry = 38` indeed corresponds to the optimal parameter value according to the random forest algorithm random selection of predictors (increasing the parameter value beyond `38` decreases the resulting accuracy) :
+
+
+```r
+plot(mod3rf, main = list("Figure 4 : Random forest model predictors random selection", cex = 0.8))
+```
+
+![](index_files/figure-html/unnamed-chunk-11-1.png)<!-- -->
+
+Let's now check the accuracy of our random forest model using `caret`'s `confusionMatrix` function :
 
 
 ```r
@@ -643,14 +629,20 @@ confusionMatrix(pred3rf, trainingOk$classe)
 ## Balanced Accuracy      1.0000   1.0000   1.0000   1.0000   1.0000
 ```
 
-Finally, we can plot our final model variables importance. The x-axis represents the total decrease in node impurities from splitting on the variable, averaged over all trees, and measured by the Gini index (as this is a classification task) : 
+As we can see, our random forest model enables us to correctly predict the `classe` of $100\%$ of the training observations (i.e. an in sample accuracy of $1$), with a $(0.9998, 1)$ $95\%$ confidence interval. 
+
+Our random forest model also correctly identifies the `classe` of the $20$ test cases (out of sample) contained in the prediction quiz part of this assignment.
+
+We can also plot our final model variables importance. *Figure 5* below shows the $20$ most important variables. The x-axis represents the total decrease in node impurities from splitting on the variable, averaged over all trees, as measured by the Gini index (as this is a classification task) : 
 
 
 ```r
-varImpPlot(mod3rf$finalModel, n.var = 20, type = 2, cex = 0.7, color = "blue", main = "Figure 4 : Final model (random forest) variables importance")
+varImpPlot(mod3rf$finalModel, n.var = 20, type = 2, cex = 0.7, color = "blue", main = "Figure 5 : Final model (random forest) variables importance")
 ```
 
-![](index_files/figure-html/unnamed-chunk-12-1.png)<!-- -->
+![](index_files/figure-html/unnamed-chunk-13-1.png)<!-- -->
+
+Finally, let's look at our final random forest model in more details :
 
 
 ```r
@@ -675,4 +667,10 @@ mod3rf$finalModel
 ## E    0    0    0    1 3606 0.0002772387
 ```
 
-Using **5-fold cross validation** when building our models gives us an estimate of the out of sample error (OOB, out-of-bag), as for each fold the model is trained on $\frac{4}{5}$ of the training data and then tested on the held-out remaining $\frac{1}{5}$. The resulting out of sample error (OOB) estimate seems quite low ($0.05\%$), but we would need more than $6$ individuals in our training data to increase the generalization, i.e. prediction abilities of our model. We might also need a larger test set containing more than $20$ observations to confirm the out of sample accuracy. 
+The resulting **out of sample (OOB) error** estimate of our final random forest model seems quite low ($0.05\%$), but we would probably need more than $6$ individuals in our training data to increase the generalization, i.e. the prediction ability of our model, as well as its *robustness*. We might also need a larger test set (i.e. containing more than $20$ observations) to definitely confirm the out of sample accuracy. 
+
+# Credits
+
+- This document was created in RStudio version 1.0.136, with R version 3.3.3, under Mac OSX 10.11.6.
+
+- The HTML version was knitted using a customized version of the [Avenue CSS file](https://github.com/ttscoff/MarkedCustomStyles/blob/master/Avenue.css) by [Brett Terpstra](http://brettterpstra.com/).
