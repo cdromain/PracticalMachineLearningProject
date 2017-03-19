@@ -4,4 +4,4 @@ Repository for the Johns Hopkins D.S.S. Practical Machine Learning course projec
 
 ### Note to the reviewers :
 
-Please see the Github pages accessible at https://cdromain.github.io/PracticalMachineLearningProject
+Please see the Github Pages html version accessible at https://cdromain.github.io/PracticalMachineLearningProject
